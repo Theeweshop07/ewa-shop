@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>EWA SHOP — Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    databaseURL: "https://ewa-shop-default-rtdb.firebaseio.com/"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  window._db = db;
+  window._ref = ref;
+  window._update = update;
+  window._remove = remove;
+  window._onValue = onValue;
+  window._firebaseReady = true;
+  window.dispatchEvent(new Event('firebaseReady'));
+</script>
+<style>
+  :root {
+    --red: #ff2244;
+    --red2: #cc1133;
+    --glow: #ff224455;
+    --dark: #07070e;
+    --dark2: #0c0c17;
+    --card: #0f0f1d;
+    --card2: #121222;
+    --border: #ffffff0d;
+    --border2: #ff22441a;
+    --gold: #ffc84a;
+    --text: #e8e8f4;
+    --muted: #55558a;
+    --green: #00e87a;
+    --greenglow: #00e87a33;
+    --orange: #ff8800;
+    --blue: #4488ff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background: radial-gradient(ellipse at 80% 10%, #ff224410, transparent 50%),
+                radial-gradient(ellipse at 5% 80%, #4488ff08, transparent 40%);
+    pointer-events:none; z-index:0;
+  }
+
+  /* ===== LOGIN ===== */
+  .login-screen {
+    position:fixed; inset:0; z-index:999;
+    background:var(--dark);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; padding:24px;
+  }
+  .login-screen.hidden { display:none; }
+
+  .login-logo {
+    width:72px; height:72px; border-radius:20px;
+    background:linear-gradient(135deg,#1a0810,var(--dark2));
+    border:2px solid var(--red);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Orbitron',sans-serif; font-size:10px; font-weight:900;
+    color:var(--red); line-height:1.3; text-align:center;
+    box-shadow:0 0 30px var(--glow); margin-bottom:24px;
+    position:relative; overflow:hidden;
+  }
+  .login-logo::before {
+    content:''; position:absolute; top:-50%; left:-50%;
+    width:200%; height:200%;
+    background:conic-gradient(from 0deg,transparent 70%,var(--red) 100%);
+    animation:spin 4s linear infinite; opacity:0.3;
+  }
+  .login-logo span { position:relative; z-index:1; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  .login-title {
+    font-family:'Orbitron',sans-serif; font-size:20px; font-weight:900;
+    letter-spacing:3px; color:#fff; margin-bottom:4px; text-align:center;
+  }
+  .login-sub { font-size:12px; color:var(--muted); letter-spacing:3px; margin-bottom:36px; text-align:center; }
+
+  .login-box {
+    background:var(--card); border:1px solid var(--border2);
+    border-radius:20px; padding:28px 24px; width:100%; max-width:360px;
+  }
+  .login-label { font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; display:block; margin-bottom:6px; }
+  .login-input {
+    width:100%; background:var(--dark2); border:1px solid var(--border);
+    border-radius:12px; padding:14px 16px; color:var(--text);
+    font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:600;
+    outline:none; transition:border-color 0.2s; margin-bottom:16px;
+  }
+  .login-input:focus { border-color:var(--red); }
+  .login-input::placeholder { color:var(--muted); }
+  .login-btn {
+    width:100%; padding:15px;
+    background:linear-gradient(135deg,var(--red),var(--red2));
+    border:none; border-radius:12px; color:#fff;
+    font-family:'Orbitron',sans-serif; font-size:13px; font-weight:700; letter-spacing:2px;
+    cursor:pointer; transition:all 0.2s; box-shadow:0 6px 20px var(--glow);
+  }
+  .login-btn:hover { transform:translateY(-2px); }
+  .login-err { color:var(--red); font-size:13px; text-align:center; margin-top:12px; display:none; }
+
+  /* ===== MAIN APP ===== */
+  .app { display:none; min-height:100vh; padding-bottom:80px; }
+  .app.visible { display:block; }
+
+  .wrap { max-width:480px; margin:0 auto; padding:0 14px; position:relative; z-index:1; }
+
+  /* HEADER */
+  .header {
+    padding:20px 0 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border); margin-bottom:16px;
+  }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  .h-logo {
+    width:40px; height:40px; border-radius:11px;
+    background:linear-gradient(135deg,#1a0810,var(--dark2));
+    border:1.5px solid var(--red);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Orbitron',sans-serif; font-size:7px; font-weight:900;
+    color:var(--red); line-height:1.2; text-align:center;
+    box-shadow:0 0 12px var(--glow);
+  }
+  .h-name { font-family:'Orbitron',sans-serif; font-size:13px; font-weight:900; color:#fff; letter-spacing:2px; }
+  .h-sub { font-size:10px; color:var(--red); letter-spacing:2px; }
+
+  .live-dot {
+    display:flex; align-items:center; gap:6px;
+    background:var(--card2); border:1px solid var(--border2);
+    border-radius:20px; padding:6px 12px;
+    font-size:11px; color:var(--green); letter-spacing:1px;
+  }
+  .live-dot::before {
+    content:''; width:7px; height:7px; border-radius:50%; background:var(--green);
+    box-shadow:0 0 8px var(--green); animation:blink 1.5s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* STATS */
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+  .stat-c {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:12px; padding:14px 8px; text-align:center;
+  }
+  .stat-v { font-family:'Orbitron',sans-serif; font-size:22px; font-weight:900; }
+  .stat-v.red { color:var(--red); text-shadow:0 0 10px var(--glow); }
+  .stat-v.gold { color:var(--gold); }
+  .stat-v.green { color:var(--green); }
+  .stat-l { font-size:10px; color:var(--muted); letter-spacing:1px; margin-top:3px; }
+
+  /* TABS */
+  .tabs {
+    display:flex; background:var(--card); border:1px solid var(--border);
+    border-radius:14px; padding:5px; margin-bottom:16px; gap:4px;
+  }
+  .tab {
+    flex:1; padding:9px 4px; border:none; background:transparent;
+    color:var(--muted); font-family:'Rajdhani',sans-serif;
+    font-size:11px; font-weight:700; letter-spacing:1px;
+    border-radius:10px; cursor:pointer; transition:all 0.22s; text-transform:uppercase;
+    position:relative;
+  }
+  .tab.active { background:linear-gradient(135deg,var(--red),var(--red2)); color:#fff; box-shadow:0 4px 14px var(--glow); }
+  .tab-badge {
+    position:absolute; top:-6px; right:4px;
+    min-width:18px; height:18px; background:var(--gold); border-radius:9px;
+    font-family:'Orbitron',sans-serif; font-size:9px; font-weight:700; color:#000;
+    display:none; align-items:center; justify-content:center; padding:0 4px;
+  }
+  .tab-badge.show { display:flex; }
+
+  .section { display:none; animation:fadeUp 0.3s ease; }
+  .section.active { display:block; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+  .sec-title {
+    font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:3px;
+    color:var(--red); text-transform:uppercase; margin-bottom:14px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .sec-title::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--red),transparent); }
+
+  /* ORDER CARD */
+  .order-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:16px; margin-bottom:10px;
+    transition:border-color 0.2s; position:relative; overflow:hidden;
+  }
+  .order-card.pending { border-left:3px solid var(--gold); }
+  .order-card.accepted { border-left:3px solid var(--green); }
+  .order-card.rejected { border-left:3px solid var(--red); opacity:0.6; }
+
+  .order-top {
+    display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px;
+  }
+  .order-user { display:flex; align-items:center; gap:10px; }
+  .user-avatar {
+    width:40px; height:40px; border-radius:11px;
+    background:linear-gradient(135deg,var(--red),#880022);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Orbitron',sans-serif; font-size:14px; font-weight:900; color:#fff;
+    flex-shrink:0;
+  }
+  .user-name { font-family:'Orbitron',sans-serif; font-size:13px; font-weight:700; color:#fff; }
+  .user-contact { font-size:12px; color:var(--blue); margin-top:2px; }
+
+  .order-status-badge {
+    padding:4px 10px; border-radius:8px; font-family:'Orbitron',sans-serif;
+    font-size:9px; font-weight:700; letter-spacing:1px; flex-shrink:0;
+  }
+  .badge-pending { background:#ffc84a22; color:var(--gold); border:1px solid #ffc84a44; }
+  .badge-accepted { background:#00e87a22; color:var(--green); border:1px solid #00e87a44; }
+  .badge-rejected { background:#ff224422; color:var(--red); border:1px solid #ff224444; }
+
+  /* ORDER ITEMS */
+  .order-items { background:var(--dark2); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+  .order-item {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:5px 0; border-bottom:1px solid var(--border);
+    font-size:13px;
+  }
+  .order-item:last-child { border-bottom:none; padding-bottom:0; }
+  .oi-left { display:flex; align-items:center; gap:8px; }
+  .oi-rx { font-family:'Orbitron',sans-serif; font-size:12px; color:#fff; }
+  .oi-qty { color:var(--muted); font-size:11px; }
+  .oi-sum { color:var(--gold); font-family:'Orbitron',sans-serif; font-size:12px; }
+
+  .order-total {
+    display:flex; justify-content:space-between; align-items:center;
+    padding-top:8px; border-top:1px solid var(--border2);
+    margin-bottom:12px;
+  }
+  .ot-rx { font-size:13px; color:var(--muted); }
+  .ot-rx span { color:var(--gold); font-family:'Orbitron',sans-serif; font-weight:700; }
+  .ot-sum { font-family:'Orbitron',sans-serif; font-size:16px; font-weight:900; color:#fff; }
+
+  .order-time { font-size:11px; color:var(--muted); margin-bottom:12px; }
+
+  /* ACTION BUTTONS */
+  .order-actions { display:flex; gap:8px; }
+  .btn-accept {
+    flex:1; padding:11px;
+    background:linear-gradient(135deg,#00aa55,#007733);
+    border:none; border-radius:10px; color:#fff;
+    font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700; letter-spacing:1px;
+    cursor:pointer; transition:all 0.2s; box-shadow:0 4px 14px #00e87a33;
+  }
+  .btn-accept:hover { transform:translateY(-1px); }
+  .btn-reject {
+    flex:1; padding:11px;
+    background:var(--card2); border:1px solid var(--border2);
+    border-radius:10px; color:var(--red);
+    font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700; letter-spacing:1px;
+    cursor:pointer; transition:all 0.2s;
+  }
+  .btn-reject:hover { background:#ff224415; }
+  .btn-delete {
+    width:40px; padding:11px;
+    background:var(--card2); border:1px solid var(--border);
+    border-radius:10px; color:var(--muted); font-size:16px;
+    cursor:pointer; transition:all 0.2s;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .btn-delete:hover { color:var(--red); border-color:var(--red); }
+
+  .done-label {
+    text-align:center; padding:8px; border-radius:10px;
+    font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:1px;
+  }
+  .done-accepted { background:#00e87a15; color:var(--green); border:1px solid #00e87a33; }
+  .done-rejected { background:#ff224415; color:var(--red); border:1px solid #ff224433; }
+
+  .empty-state { text-align:center; padding:48px 20px; color:var(--muted); }
+  .empty-icon { font-size:44px; margin-bottom:12px; }
+  .empty-txt { font-size:14px; letter-spacing:1px; }
+
+  /* PRICES EDITOR */
+  .price-edit-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:12px; padding:14px 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:7px;
+  }
+  .pe-left { display:flex; align-items:center; gap:10px; }
+  .pe-icon { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#ffd700,#ff8800); display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .pe-rx { font-family:'Orbitron',sans-serif; font-size:14px; font-weight:700; color:#fff; }
+  .pe-sum { font-size:12px; color:var(--gold); margin-top:1px; }
+  .pe-badge { font-size:9px; color:var(--red); letter-spacing:1px; }
+
+  /* SETTINGS */
+  .settings-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:14px; padding:18px 20px; margin-bottom:10px;
+  }
+  .settings-title { font-family:'Orbitron',sans-serif; font-size:12px; letter-spacing:2px; color:#fff; margin-bottom:14px; }
+  .settings-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
+  .settings-row:last-child { border-bottom:none; }
+  .settings-label { font-size:14px; color:var(--text); }
+  .settings-val { font-size:13px; color:var(--muted); }
+
+  .logout-btn {
+    width:100%; padding:14px;
+    background:var(--card2); border:1px solid var(--border2);
+    border-radius:12px; color:var(--red);
+    font-family:'Orbitron',sans-serif; font-size:13px; font-weight:700; letter-spacing:2px;
+    cursor:pointer; transition:all 0.2s; margin-top:8px;
+  }
+  .logout-btn:hover { background:#ff224415; }
+
+  /* BOTTOM NAV */
+  .bnav {
+    position:fixed; bottom:0; left:0; right:0; max-width:480px; margin:0 auto;
+    background:var(--dark2); border-top:1px solid var(--border); display:flex; z-index:100;
+  }
+  .bn {
+    flex:1; padding:10px 4px 12px; background:none; border:none; color:var(--muted);
+    font-family:'Rajdhani',sans-serif; font-size:9px; font-weight:700; letter-spacing:1px;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    cursor:pointer; transition:color 0.2s; text-transform:uppercase; position:relative;
+  }
+  .bn-icon { font-size:20px; transition:transform 0.2s; }
+  .bn.active { color:var(--red); }
+  .bn.active .bn-icon { transform:scale(1.15); }
+  .bn-badge {
+    position:absolute; top:4px; right:calc(50% - 18px);
+    min-width:16px; height:16px; background:var(--gold); border-radius:8px;
+    font-family:'Orbitron',sans-serif; font-size:8px; font-weight:700; color:#000;
+    display:none; align-items:center; justify-content:center; padding:0 3px;
+  }
+  .bn-badge.show { display:flex; }
+
+  /* NOTIFICATION */
+  .notif {
+    position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-80px);
+    max-width:340px; width:90%;
+    background:var(--card2); border:1px solid var(--border2);
+    border-radius:14px; padding:14px 18px;
+    display:flex; align-items:center; gap:12px;
+    z-index:500; transition:transform 0.35s cubic-bezier(0.34,1.3,0.64,1);
+    box-shadow:0 8px 32px #00000066;
+  }
+  .notif.show { transform:translateX(-50%) translateY(0); }
+  .notif-icon { font-size:24px; flex-shrink:0; }
+  .notif-text { font-size:13px; line-height:1.5; }
+  .notif-title { font-family:'Orbitron',sans-serif; font-size:11px; color:#fff; letter-spacing:1px; margin-bottom:2px; }
+  .notif-desc { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-logo"><span>EWA<br>SHOP</span></div>
+  <div class="login-title">ADMIN PANEL</div>
+  <div class="login-sub">FAQAT ADMIN UCHUN</div>
+  <div class="login-box">
+    <label class="login-label">Admin paroli</label>
+    <input class="login-input" type="password" id="loginInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">🔐 KIRISH</button>
+    <div class="login-err" id="loginErr">❌ Noto'g'ri parol!</div>
+  </div>
+</div>
+
+<!-- NOTIFICATION -->
+<div class="notif" id="notif">
+  <div class="notif-icon" id="notifIcon">🔔</div>
+  <div class="notif-text">
+    <div class="notif-title" id="notifTitle"></div>
+    <div class="notif-desc" id="notifDesc"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app" id="app">
+  <div class="wrap">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="header-left">
+        <div class="h-logo">EWA<br>SHOP</div>
+        <div>
+          <div class="h-name">ADMIN</div>
+          <div class="h-sub">PANEL</div>
+        </div>
+      </div>
+      <div class="live-dot">JONLI</div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-c">
+        <div class="stat-v red" id="statPending">0</div>
+        <div class="stat-l">Kutmoqda</div>
+      </div>
+      <div class="stat-c">
+        <div class="stat-v green" id="statAccepted">0</div>
+        <div class="stat-l">Bajarildi</div>
+      </div>
+      <div class="stat-c">
+        <div class="stat-v gold" id="statTotal">0</div>
+        <div class="stat-l">Jami</div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab active" id="tab-pending" onclick="showTab('pending')">
+        ⏳ Kutmoqda
+        <span class="tab-badge" id="badge-pending">0</span>
+      </button>
+      <button class="tab" id="tab-accepted" onclick="showTab('accepted')">✅ Bajarildi</button>
+      <button class="tab" id="tab-prices" onclick="showTab('prices')">💰 Narxlar</button>
+      <button class="tab" id="tab-settings" onclick="showTab('settings')">⚙️ Sozlama</button>
+    </div>
+
+    <!-- PENDING ORDERS -->
+    <div class="section active" id="sec-pending">
+      <div class="sec-title">Yangi Buyurtmalar</div>
+      <div id="pendingList">
+        <div class="empty-state"><div class="empty-icon">📭</div><div class="empty-txt">Yangi buyurtma yo'q</div></div>
+      </div>
+    </div>
+
+    <!-- ACCEPTED ORDERS -->
+    <div class="section" id="sec-accepted">
+      <div class="sec-title">Bajarilgan Buyurtmalar</div>
+      <div id="acceptedList">
+        <div class="empty-state"><div class="empty-icon">📦</div><div class="empty-txt">Bajarilgan buyurtma yo'q</div></div>
+      </div>
+    </div>
+
+    <!-- PRICES -->
+    <div class="section" id="sec-prices">
+      <div class="sec-title">Narxlar Ro'yxati</div>
+      <div id="pricesList"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="section" id="sec-settings">
+      <div class="sec-title">Sozlamalar</div>
+      <div class="settings-card">
+        <div class="settings-title">ADMIN MA'LUMOTLARI</div>
+        <div class="settings-row"><span class="settings-label">Telegram</span><span class="settings-val">@aastaaaaaaa</span></div>
+        <div class="settings-row"><span class="settings-label">Firebase DB</span><span class="settings-val">ewa-shop</span></div>
+        <div class="settings-row"><span class="settings-label">Status</span><span class="settings-val" style="color:var(--green)">● Jonli</span></div>
+      </div>
+      <div class="settings-card">
+        <div class="settings-title">STATISTIKA</div>
+        <div class="settings-row"><span class="settings-label">Jami buyurtmalar</span><span class="settings-val" id="setTotal">0</span></div>
+        <div class="settings-row"><span class="settings-label">Bajarilgan</span><span class="settings-val" id="setAccepted">0</span></div>
+        <div class="settings-row"><span class="settings-label">Rad etilgan</span><span class="settings-val" id="setRejected">0</span></div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">🚪 CHIQISH</button>
+    </div>
+
+  </div><!-- /wrap -->
+</div><!-- /app -->
+
+<!-- BOTTOM NAV -->
+<div class="bnav" id="bnav" style="display:none">
+  <button class="bn active" id="bn-pending" onclick="showTab('pending')">
+    <span class="bn-icon">⏳</span>Kutmoqda
+    <span class="bn-badge" id="bn-badge-pending">0</span>
+  </button>
+  <button class="bn" id="bn-accepted" onclick="showTab('accepted')">
+    <span class="bn-icon">✅</span>Bajarildi
+  </button>
+  <button class="bn" id="bn-prices" onclick="showTab('prices')">
+    <span class="bn-icon">💰</span>Narxlar
+  </button>
+  <button class="bn" id="bn-settings" onclick="showTab('settings')">
+    <span class="bn-icon">⚙️</span>Sozlama
+  </button>
+</div>
+
+<script>
+// ======= PASSWORD =======
+const ADMIN_PASSWORD = 'ewa2025admin'; // O'ZINGIZ XOHLAGAN PAROLGA ALMASHTIRING
+
+function doLogin(){
+  const val = document.getElementById('loginInput').value;
+  if(val === ADMIN_PASSWORD){
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('app').classList.add('visible');
+    document.getElementById('bnav').style.display = 'flex';
+    startListening();
+  } else {
+    document.getElementById('loginErr').style.display = 'block';
+    document.getElementById('loginInput').value = '';
+    setTimeout(()=>document.getElementById('loginErr').style.display='none', 2500);
+  }
+}
+
+function doLogout(){
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('bnav').style.display = 'none';
+  document.getElementById('loginInput').value = '';
+}
+
+// ======= DATA =======
+let orders = {};
+let prevCount = 0;
+
+const prices = [
+  {rx:40,sum:6500,group:'Starter'},
+  {rx:80,sum:13000,group:'Starter'},
+  {rx:160,sum:27000,group:'Starter'},
+  {rx:200,sum:35000,group:'Starter'},
+  {rx:240,sum:42000,group:'Starter'},
+  {rx:280,sum:49000,group:'Starter'},
+  {rx:320,sum:56000,group:'Starter'},
+  {rx:360,sum:63000,group:'Starter'},
+  {rx:500,sum:65000,group:'Popular',hot:true},
+  {rx:540,sum:73000,group:'Popular'},
+  {rx:580,sum:80000,group:'Popular'},
+  {rx:620,sum:87000,group:'Popular'},
+  {rx:660,sum:94000,group:'Popular'},
+  {rx:700,sum:101000,group:'Popular'},
+  {rx:740,sum:108000,group:'Popular'},
+  {rx:780,sum:115000,group:'Popular'},
+  {rx:820,sum:122000,group:'Popular'},
+  {rx:1000,sum:132000,group:'Premium'},
+  {rx:2000,sum:265000,group:'Premium'},
+  {rx:5250,sum:660000,group:'Premium',hot:true},
+  {rx:11000,sum:1310000,group:'Premium'},
+];
+
+function fmt(n){ return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,' '); }
+
+// ======= FIREBASE LISTENER =======
+function startListening(){
+  if(!window._firebaseReady) return;
+  const ordersRef = window._ref(window._db, 'orders');
+  window._onValue(ordersRef, (snapshot)=>{
+    const data = snapshot.val() || {};
+    const newCount = Object.values(data).filter(o=>o.status==='pending').length;
+
+    // Yangi buyurtma keldi
+    if(newCount > prevCount && prevCount >= 0){
+      const diff = newCount - prevCount;
+      showNotif('🛒', 'YANGI BUYURTMA!', `${diff} ta yangi buyurtma keldi!`);
+    }
+    prevCount = newCount;
+    orders = data;
+    renderAll();
+  });
+  renderPrices();
+}
+
+window.addEventListener('firebaseReady', ()=>{
+  // Firebase tayyor
+});
+
+// ======= RENDER =======
+function renderAll(){
+  renderPending();
+  renderAccepted();
+  updateStats();
+}
+
+function renderPending(){
+  const container = document.getElementById('pendingList');
+  const pending = Object.entries(orders).filter(([k,o])=>o.status==='pending');
+
+  // badge
+  const cnt = pending.length;
+  const badge = document.getElementById('badge-pending');
+  const bnBadge = document.getElementById('bn-badge-pending');
+  badge.textContent = cnt; bnBadge.textContent = cnt;
+  if(cnt>0){badge.classList.add('show');bnBadge.classList.add('show');}
+  else{badge.classList.remove('show');bnBadge.classList.remove('show');}
+
+  if(pending.length===0){
+    container.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-txt">Yangi buyurtma yo\'q</div></div>';
+    return;
+  }
+
+  // Sort by timestamp desc
+  pending.sort((a,b)=>(b[1].timestamp||0)-(a[1].timestamp||0));
+
+  container.innerHTML = pending.map(([key, o])=>`
+    <div class="order-card pending" id="oc-${key}">
+      <div class="order-top">
+        <div class="order-user">
+          <div class="user-avatar">${o.username ? o.username[0].toUpperCase() : '?'}</div>
+          <div>
+            <div class="user-name">${o.username || '—'}</div>
+            <div class="user-contact">${o.contact || '—'}</div>
+          </div>
+        </div>
+        <div class="order-status-badge badge-pending">KUTMOQDA</div>
+      </div>
+
+      <div class="order-items">
+        ${(o.items||[]).map(item=>`
+          <div class="order-item">
+            <div class="oi-left">
+              <span>🪙</span>
+              <span class="oi-rx">${fmt(item.robux)} Robux</span>
+              <span class="oi-qty">× ${item.qty}</span>
+            </div>
+            <div class="oi-sum">${fmt(item.summa)} so'm</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="order-total">
+        <div class="ot-rx">Jami: <span>${fmt(o.totalRobux||0)} 🪙</span></div>
+        <div class="ot-sum">${fmt(o.totalSum||0)} so'm</div>
+      </div>
+
+      <div class="order-time">⏰ ${o.time || '—'}</div>
+
+      <div class="order-actions">
+        <button class="btn-accept" onclick="acceptOrder('${key}','${o.username}','${o.contact}',${o.totalRobux},${o.totalSum})">✅ QABUL QILISH</button>
+        <button class="btn-reject" onclick="rejectOrder('${key}')">❌ RAD ETISH</button>
+        <button class="btn-delete" onclick="deleteOrder('${key}')">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderAccepted(){
+  const container = document.getElementById('acceptedList');
+  const done = Object.entries(orders).filter(([k,o])=>o.status!=='pending');
+  done.sort((a,b)=>(b[1].timestamp||0)-(a[1].timestamp||0));
+
+  if(done.length===0){
+    container.innerHTML='<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-txt">Bajarilgan buyurtma yo\'q</div></div>';
+    return;
+  }
+
+  container.innerHTML = done.map(([key,o])=>`
+    <div class="order-card ${o.status}">
+      <div class="order-top">
+        <div class="order-user">
+          <div class="user-avatar" style="background:${o.status==='accepted'?'linear-gradient(135deg,#00aa55,#007733)':'linear-gradient(135deg,#880022,#440011)'}">${o.username?o.username[0].toUpperCase():'?'}</div>
+          <div>
+            <div class="user-name">${o.username||'—'}</div>
+            <div class="user-contact">${o.contact||'—'}</div>
+          </div>
+        </div>
+        <div class="order-status-badge ${o.status==='accepted'?'badge-accepted':'badge-rejected'}">${o.status==='accepted'?'BAJARILDI':'RAD ETILDI'}</div>
+      </div>
+      <div class="order-total" style="margin-bottom:8px">
+        <div class="ot-rx">Jami: <span>${fmt(o.totalRobux||0)} 🪙</span></div>
+        <div class="ot-sum">${fmt(o.totalSum||0)} so'm</div>
+      </div>
+      <div class="order-time">⏰ ${o.time||'—'}</div>
+      <div class="order-actions">
+        <button class="btn-delete" onclick="deleteOrder('${key}')" style="width:100%;border-radius:10px">🗑 O'chirish</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderPrices(){
+  const c = document.getElementById('pricesList');
+  let lastGroup='', html='';
+  prices.forEach(p=>{
+    if(p.group!==lastGroup){
+      html+=`<div style="font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin:14px 0 8px 2px">${p.group}</div>`;
+      lastGroup=p.group;
+    }
+    html+=`<div class="price-edit-card">
+      <div class="pe-left">
+        <div class="pe-icon">🪙</div>
+        <div>
+          <div class="pe-rx">${fmt(p.rx)} Robux${p.hot?' <span style="font-size:9px;color:var(--red)">TOP</span>':''}</div>
+          <div class="pe-sum">${fmt(p.sum)} so'm</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1px">${p.group}</div>
+    </div>`;
+  });
+  c.innerHTML=html;
+}
+
+function updateStats(){
+  const all = Object.values(orders);
+  const pending = all.filter(o=>o.status==='pending').length;
+  const accepted = all.filter(o=>o.status==='accepted').length;
+  const rejected = all.filter(o=>o.status==='rejected').length;
+
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statAccepted').textContent = accepted;
+  document.getElementById('statTotal').textContent = all.length;
+  document.getElementById('setTotal').textContent = all.length;
+  document.getElementById('setAccepted').textContent = accepted;
+  document.getElementById('setRejected').textContent = rejected;
+}
+
+// ======= ACTIONS =======
+async function acceptOrder(key, username, contact, totalRobux, totalSum){
+  if(!confirm(`✅ "${username}" buyurtmasini qabul qilasizmi?\n🪙 ${fmt(totalRobux)} Robux\n💵 ${fmt(totalSum)} so'm`)) return;
+  await window._update(window._ref(window._db,`orders/${key}`), {status:'accepted'});
+  showNotif('✅', 'QABUL QILINDI', `${username} — ${fmt(totalRobux)} Robux`);
+}
+
+async function rejectOrder(key){
+  if(!confirm('❌ Buyurtmani rad etasizmi?')) return;
+  await window._update(window._ref(window._db,`orders/${key}`), {status:'rejected'});
+  showNotif('❌', 'RAD ETILDI', 'Buyurtma rad etildi');
+}
+
+async function deleteOrder(key){
+  if(!confirm('🗑 Buyurtmani o\'chirasizmi? Bu amalni qaytarib bo\'lmaydi!')) return;
+  await window._remove(window._ref(window._db,`orders/${key}`));
+}
+
+// ======= TABS =======
+const tabs = ['pending','accepted','prices','settings'];
+function showTab(id){
+  tabs.forEach(t=>{
+    document.getElementById('sec-'+t)?.classList.remove('active');
+    document.getElementById('tab-'+t)?.classList.remove('active');
+    document.getElementById('bn-'+t)?.classList.remove('active');
+  });
+  document.getElementById('sec-'+id)?.classList.add('active');
+  document.getElementById('tab-'+id)?.classList.add('active');
+  document.getElementById('bn-'+id)?.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ======= NOTIFICATION =======
+let notifTimer;
+function showNotif(icon, title, desc){
+  clearTimeout(notifTimer);
+  document.getElementById('notifIcon').textContent = icon;
+  document.getElementById('notifTitle').textContent = title;
+  document.getElementById('notifDesc').textContent = desc;
+  document.getElementById('notif').classList.add('show');
+  notifTimer = setTimeout(()=>document.getElementById('notif').classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>
